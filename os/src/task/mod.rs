@@ -17,11 +17,18 @@ mod task;
 use crate::config::MAX_APP_NUM;
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
+
+use crate::config::MAX_SYSCALL_NUM;
+use crate::syscall::TaskInfo;
+
 use lazy_static::*;
 use switch::__switch;
-pub use task::{TaskControlBlock, TaskStatus};
+pub use task::{TaskControlBlock, TaskStatus, TaskInfoInner};
 
 pub use context::TaskContext;
+
+// use crate::task::task::TaskInfoInner;
+use crate::timer::get_time_ms;
 
 /// The task manager, where all the tasks are managed.
 ///
@@ -54,6 +61,10 @@ lazy_static! {
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
+            task_info_inner: { TaskInfoInner {
+                syscall_times: [0; MAX_SYSCALL_NUM],
+                start_time: 0
+            } },
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
@@ -135,6 +146,34 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    // ch3 编写代码 begin
+    fn set_syscall_times(&self, syscall_id : usize) {
+
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].task_info_inner.syscall_times[syscall_id] += 1;
+    }
+
+    fn get_cur_task_info(&self, ti: *mut TaskInfo) {
+
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+
+        let TaskInfoInner {syscall_times, start_time} = inner.tasks[current].task_info_inner;
+
+
+        unsafe {
+            *ti = TaskInfo {
+                status: TaskStatus::Running,
+                syscall_times,
+                time: get_time_ms() - start_time,
+            };
+        }
+
+    }
+
+    // ch3 编写代码 end
 }
 
 /// Run the first task in task list.
@@ -169,3 +208,16 @@ pub fn exit_current_and_run_next() {
     mark_current_exited();
     run_next_task();
 }
+
+//ch3 编写代码 start
+/// balaba
+pub fn set_syscall(syscall_id: usize) {
+    TASK_MANAGER.set_syscall_times(syscall_id);
+}
+
+/// balaba
+pub fn get_task_info(ti: *mut TaskInfo) {
+    TASK_MANAGER.get_cur_task_info(ti);
+}
+
+//ch3 编写代码 end

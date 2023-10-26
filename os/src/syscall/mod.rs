@@ -26,8 +26,15 @@ mod process;
 
 use fs::*;
 use process::*;
+
+pub use process::TaskInfo;
+
+use crate::task::set_syscall;
 /// handle syscall exception with `syscall_id` and other arguments
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
+    // ch3 编写代码 start
+    set_syscall(syscall_id);
+    // ch3 编写代码 end
     match syscall_id {
         SYSCALL_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
         SYSCALL_EXIT => sys_exit(args[0] as i32),
