@@ -1,6 +1,6 @@
 //! Implementation of [`PageTableEntry`] and [`PageTable`].
 
-use super::{frame_alloc, FrameTracker, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
+use super::{frame_alloc, FrameTracker, PhysAddr, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
 use alloc::vec;
 use alloc::vec::Vec;
 use bitflags::*;
@@ -170,4 +170,25 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
         start = end_va.into();
     }
     v
+}
+
+/// 获取内核态的指针
+pub fn translate_ptr<T>(token: usize, ptr: *const T) -> *mut T {
+
+    let page_table: PageTable = PageTable::from_token(token);
+
+    let raw_address = ptr as usize;
+    let virtual_address = VirtAddr::from(raw_address);
+
+    let vpn = virtual_address.floor();
+    let ppn: PhysAddr = page_table.translate(vpn).unwrap().ppn().into();
+
+    let offset = virtual_address.page_offset();
+    let start: usize = ppn.into();
+
+    let physical_address: usize = start + offset;
+
+    return physical_address as *mut T;
+
+
 }

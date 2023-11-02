@@ -3,7 +3,10 @@ use crate::{
     config::MAX_SYSCALL_NUM,
     task::{
         change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus,
+        current_user_token, set_task_info, mmap, munmap
     },
+    timer::get_time_us,
+    mm::{translate_ptr,  VirtAddr, VirtPageNum}
 };
 
 #[repr(C)]
@@ -17,11 +20,11 @@ pub struct TimeVal {
 #[allow(dead_code)]
 pub struct TaskInfo {
     /// Task status in it's life cycle
-    status: TaskStatus,
+    pub status: TaskStatus,
     /// The numbers of syscall called by task
-    syscall_times: [u32; MAX_SYSCALL_NUM],
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],
     /// Total running time of task
-    time: usize,
+    pub time: usize,
 }
 
 /// task exits and submit an exit code
@@ -43,7 +46,16 @@ pub fn sys_yield() -> isize {
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
 pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     trace!("kernel: sys_get_time");
-    -1
+
+    let time = get_time_us();
+    let ts = translate_ptr(current_user_token(), _ts);
+    unsafe {
+        *ts = TimeVal {
+            sec: time / 1_000_000,
+            usec: time % 1_000_000,
+        };
+    }
+    0
 }
 
 /// YOUR JOB: Finish sys_task_info to pass testcases
@@ -51,19 +63,50 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
 pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
     trace!("kernel: sys_task_info NOT IMPLEMENTED YET!");
-    -1
+    
+    let ti = translate_ptr(current_user_token(), _ti);
+    set_task_info(ti);
+    0
 }
 
 // YOUR JOB: Implement mmap.
 pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
     trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
-    -1
+    let start_vaddr: VirtAddr = _start.into();
+    if !start_vaddr.aligned() {
+        debug!("map fail don't aligned");
+        return -1;
+    }
+    if _port & !0x7 != 0 || _port & 0x7 == 0 {
+        return -1;
+    }
+    if _len == 0 {
+        return 0;
+    }
+    let end_vaddr: VirtAddr = (_start + _len).into();
+    let start_vpn: VirtPageNum = start_vaddr.into();
+    let end_vpn: VirtPageNum = (end_vaddr).ceil();
+
+    mmap(start_vpn, end_vpn, _port)
 }
 
 // YOUR JOB: Implement munmap.
 pub fn sys_munmap(_start: usize, _len: usize) -> isize {
     trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
-    -1
+    let start_vaddr: VirtAddr = _start.into();
+    if !start_vaddr.aligned() {
+        debug!("unmap fail don't aligned");
+        return -1;
+    }
+    if _len == 0 {
+        return 0;
+    }
+    let end_vaddr: VirtAddr = (_start + _len).into();
+    let start_vpn: VirtPageNum = start_vaddr.into();
+    let end_vpn: VirtPageNum = (end_vaddr).ceil();
+
+    munmap(start_vpn, end_vpn)
+
 }
 /// change data segment size
 pub fn sys_sbrk(size: i32) -> isize {
