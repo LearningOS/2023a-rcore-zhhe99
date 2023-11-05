@@ -265,7 +265,7 @@ impl MemorySet {
         }
     }
 
-    /// mmap
+    /// map physical pages to some virtual oages
     pub fn mmap(&mut self, start_vpn: VirtPageNum, end_vpn: VirtPageNum, port: usize) -> isize {
         let mut flags = PTEFlags::empty();
         let mut vpn = start_vpn;
@@ -287,19 +287,16 @@ impl MemorySet {
 
         while vpn != end_vpn {
             if let Some(pte) = self.page_table.translate(vpn) {
-                debug!("find vpn {:?} pte flag = {:?}", vpn, pte.flags());
                 if pte.is_valid() {
-                    debug!("map on already mapped vpn {:?}", vpn);
-                    return -1;
+                    return -2;
                 }
             }
             if let Some(frame) = frame_alloc() {
                 let ppn = frame.ppn;
-                debug!(" map vpn {:?} and ppn {:?} flag {:?}", vpn, ppn, flags);
                 self.page_table.map(vpn, ppn, flags);
                 self.mmap_frames.insert(vpn, frame);
             } else {
-                return -1;
+                return -3;
             }
             vpn.step();
         }
@@ -307,17 +304,16 @@ impl MemorySet {
         0
     }
 
-       /// mmunmap
+       ///  unmap virtual pages
        pub fn munmap(&mut self, start_vpn: VirtPageNum, end_vpn: VirtPageNum) -> isize {
         let mut vpn = start_vpn;
         while vpn != end_vpn {
             if let Some(pte) = self.page_table.translate(vpn) {
                 if !pte.is_valid() {
-                    debug!("unmap on no map vpn");
-                    return -1;
+                    return -2;
                 }
             } else {
-                return -1;
+                return -3;
             }
             self.page_table.unmap(vpn);
             self.mmap_frames.remove(&vpn);

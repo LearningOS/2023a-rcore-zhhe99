@@ -3,7 +3,7 @@ use crate::{
     config::MAX_SYSCALL_NUM,
     task::{
         change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus,
-        current_user_token, set_task_info, mmap, munmap
+        current_user_token, get_task_info, mmap, munmap
     },
     timer::get_time_us,
     mm::{translate_ptr,  VirtAddr, VirtPageNum}
@@ -65,7 +65,7 @@ pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
     trace!("kernel: sys_task_info NOT IMPLEMENTED YET!");
     
     let ti = translate_ptr(current_user_token(), _ti);
-    set_task_info(ti);
+    get_task_info(ti);
     0
 }
 
@@ -73,39 +73,84 @@ pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
 pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
     trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
     let start_vaddr: VirtAddr = _start.into();
+
+    // 1. _start address is not aligned to a page.
+
     if !start_vaddr.aligned() {
-        debug!("map fail don't aligned");
+        println!("start address is not aligned to a page!");
         return -1;
     }
+
+    // 2. _port is not vaild.
     if _port & !0x7 != 0 || _port & 0x7 == 0 {
+        println!("Invaild port!");
         return -1;
     }
-    if _len == 0 {
-        return 0;
+
+    // 3. _len is not vaild.
+    if _len <= 0 {
+        println!("Invaild length!");
+        return -1;
     }
     let end_vaddr: VirtAddr = (_start + _len).into();
     let start_vpn: VirtPageNum = start_vaddr.into();
     let end_vpn: VirtPageNum = (end_vaddr).ceil();
 
-    mmap(start_vpn, end_vpn, _port)
+    let res = mmap(start_vpn, end_vpn, _port);
+    
+    // 4. Mapped virtual page exists.
+    // 5. Memory used up.
+
+    if res < 0 {
+        match res {
+            -2 => println!("Some virtual pages has been mapped to a physical page !"),
+            -3 => println!("Memory has been used up!"),
+            _ => {},
+    
+       }
+       return -1;
+    }
+
+     0
 }
 
 // YOUR JOB: Implement munmap.
 pub fn sys_munmap(_start: usize, _len: usize) -> isize {
     trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
+
     let start_vaddr: VirtAddr = _start.into();
+    // 1. _start address is not aligned to a page.
     if !start_vaddr.aligned() {
-        debug!("unmap fail don't aligned");
+        println!("start address is not aligned to a page!");
         return -1;
     }
-    if _len == 0 {
-        return 0;
+
+    // 2. _len is not vaild.
+    if _len <= 0 {
+        println!("Invaild length!");
+        return -1;
     }
     let end_vaddr: VirtAddr = (_start + _len).into();
     let start_vpn: VirtPageNum = start_vaddr.into();
     let end_vpn: VirtPageNum = (end_vaddr).ceil();
 
-    munmap(start_vpn, end_vpn)
+    let res = munmap(start_vpn, end_vpn);
+
+    // 4. Unmapped virtual page exists.
+    // 5. Invalid mapped physical page exists.
+
+    if res < 0 {
+        match res {
+            -2 => println!("Invalid mapped physical page exists."),
+            -3 => println!("Unmapped virtual page exists."),
+            _ => {},
+
+        }
+
+        return -1;
+    }
+    
+    0
 
 }
 /// change data segment size

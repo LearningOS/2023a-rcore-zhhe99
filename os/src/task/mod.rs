@@ -25,8 +25,8 @@ pub use task::{TaskControlBlock, TaskStatus};
 pub use context::TaskContext;
 
 use crate::syscall::TaskInfo;
-use crate::timer::get_time_us;
-
+// use crate::timer::get_time_us;
+use crate::timer::{get_time_ms, get_time_us};
 use crate::mm::VirtPageNum;
 
 /// The task manager, where all the tasks are managed.
@@ -168,7 +168,7 @@ impl TaskManager {
         }
     }
 
-    fn increase_syscall_times(&self, syscall_id: usize) {
+    fn set_syscall_times(&self, syscall_id: usize) {
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task;
         // let curr_task_tcb = &mut inner.tasks[current];
@@ -178,37 +178,27 @@ impl TaskManager {
         drop(inner);
     }
 
-    fn set_task_info(&self, task_info: *mut TaskInfo) {
+    fn get_task_info(&self, task_info: *mut TaskInfo) {
         let inner = self.inner.exclusive_access();
         let current = inner.current_task;
-        // let curr_task_tcb = &mut inner.tasks[current];
-
-        let curr_time = get_time_us() / 1000;
 
         let syscall_times = inner.tasks[current].syscall_times;
         let start_time = inner.tasks[current].start_time;
 
-
-        // debug!(
-        //     "task info current = {:#x} curr_time() = {:#x} curr start_time = {:#x}",
-        //     current, curr_time, curr_task_tcb.start_time
-        // );
+        println!{"======================================"};
+        println!("Time for us / 1000: {}", get_time_us() / 1000);
+        println!("Time for ms: {}", get_time_ms());
+        println!{"======================================"};
 
         unsafe {
-            (*task_info).time = curr_time - start_time;
-
-            (*task_info).syscall_times = syscall_times;
-
-            (*task_info).status = TaskStatus::Running;
+            *task_info = TaskInfo {
+                status: TaskStatus::Running,
+                syscall_times,
+                time: get_time_us() / 1000  - start_time,
+            };
         }
 
         drop(inner);
-
-        // task_info.time = curr_time - curr_task_tcb.start_time;
-        // task_info
-        //     .syscall_times
-        //     .copy_from_slice(&curr_task_tcb.syscall_times);
-
 
     }
 
@@ -278,22 +268,22 @@ pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
 }
 
-/// 增加syscall调用次数
+/// Increase the calling number for a specific system call
 pub fn syscall_inc(syscall_id: usize) {
-    TASK_MANAGER.increase_syscall_times(syscall_id);
+    TASK_MANAGER.set_syscall_times(syscall_id);
 }
 
-/// 设置taskinfo
-pub fn set_task_info(task_info: *mut TaskInfo) {
-    TASK_MANAGER.set_task_info(task_info);
+/// Get the current task information
+pub fn get_task_info(task_info: *mut TaskInfo) {
+    TASK_MANAGER.get_task_info(task_info);
 }
 
-/// 为当前任务申请内存
+/// Map physical pages for virtual pages
 pub fn mmap(start_vpn: VirtPageNum, end_vpn: VirtPageNum, port: usize) -> isize {
     TASK_MANAGER.mmap(start_vpn, end_vpn, port)
 }
 
-/// 释放内存
+/// Free mapped physical pages
 pub fn munmap(start_vpn: VirtPageNum, end_vpn: VirtPageNum) -> isize {
     TASK_MANAGER.munmap(start_vpn, end_vpn)
 }

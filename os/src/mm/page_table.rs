@@ -172,7 +172,7 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
     v
 }
 
-/// 获取内核态的指针
+/// get the physical address from raw pointer.
 pub fn translate_ptr<T>(token: usize, ptr: *const T) -> *mut T {
 
     let page_table: PageTable = PageTable::from_token(token);

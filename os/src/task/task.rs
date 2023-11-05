@@ -29,10 +29,11 @@ pub struct TaskControlBlock {
     /// Program break
     pub program_brk: usize,
 
-     /// 系统调用次数
-     pub syscall_times: [u32; MAX_SYSCALL_NUM],
-     /// 总运行时间
-     pub start_time: usize,
+    /// Calling number of each system calls 
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],
+    
+    /// Total running time
+    pub start_time: usize,
 }
 
 impl TaskControlBlock {
