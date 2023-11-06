@@ -23,7 +23,41 @@ impl TaskManager {
     }
     /// Take a process out of the ready queue
     pub fn fetch(&mut self) -> Option<Arc<TaskControlBlock>> {
-        self.ready_queue.pop_front()
+        // self.ready_queue.pop_front()
+
+        if self.ready_queue.len() == 0 {
+            println!("No available task!");
+            return None;
+        }
+
+        let mut min_stride = usize::MAX;
+        let mut temp = 0;
+        let mut idx = 0;
+
+        // Find the task with the smallest stride
+        for task in &self.ready_queue {
+            let stride = task.inner_exclusive_access().stride;
+            if stride < min_stride {
+                min_stride = stride;
+                idx = temp;
+            }
+            temp += 1;
+        }
+
+        self.ready_queue.remove(idx)
+
+        // // If we found a TaskControlBlock with the smallest stride, remove it from the ready queue
+        // if let Some(tcb) = min_stride_tcb {
+        //     let index = self
+        //         .ready_queue
+        //         .iter()
+        //         .position(|item| Arc::ptr_eq(item, &tcb));
+        //     if let Some(index) = index {
+                
+        //     }
+        // }
+
+        // None
     }
 }
 

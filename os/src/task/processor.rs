@@ -12,6 +12,10 @@ use crate::trap::TrapContext;
 use alloc::sync::Arc;
 use lazy_static::*;
 
+use crate::config::BIG_STRIDE;
+
+use crate::mm::VirtPageNum;
+
 /// Processor management structure
 pub struct Processor {
     ///The task currently executing on the current processor
@@ -61,6 +65,9 @@ pub fn run_tasks() {
             let mut task_inner = task.inner_exclusive_access();
             let next_task_cx_ptr = &task_inner.task_cx as *const TaskContext;
             task_inner.task_status = TaskStatus::Running;
+
+            task_inner.stride += BIG_STRIDE / task_inner.priority;
+
             // release coming task_inner manually
             drop(task_inner);
             // release coming task TCB manually
@@ -108,4 +115,36 @@ pub fn schedule(switched_task_cx_ptr: *mut TaskContext) {
     unsafe {
         __switch(switched_task_cx_ptr, idle_task_cx_ptr);
     }
+}
+
+/// mmap
+pub fn mmap(start_vpn: VirtPageNum, end_vpn: VirtPageNum, port: usize) -> isize {
+
+    // let curr_task_tcb = PROCESSOR.exclusive_access().current().unwrap();
+    // let curr_task_tcb_inner = curr_task_tcb.inner_exclusive_access();
+    // let x = curr_task_tcb_inner.memory_set.mmap(start_vpn, end_vpn, port);
+    // x
+
+    let task = current_task().unwrap();
+    let x = task
+        .inner_exclusive_access()
+        .memory_set
+        .mmap(start_vpn, end_vpn, port);
+    x
+}
+
+/// munmap
+pub fn munmap(start_vpn: VirtPageNum, end_vpn: VirtPageNum) -> isize {
+
+    // let curr_task_tcb = PROCESSOR.exclusive_access().current().unwrap();
+    // let curr_task_tcb_inner = curr_task_tcb.inner_exclusive_access();
+    // let x = curr_task_tcb_inner.memory_set.munmap(start_vpn, end_vpn);
+    // x
+
+    let task = current_task().unwrap();
+    let x = task
+        .inner_exclusive_access()
+        .memory_set
+        .munmap(start_vpn, end_vpn);
+    x
 }

@@ -213,3 +213,25 @@ pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
         .unwrap()
         .get_mut()
 }
+
+
+/// get the physical address from raw pointer.
+pub fn translated_ptr<T>(token: usize, ptr: *const T) -> *mut T {
+
+    let page_table: PageTable = PageTable::from_token(token);
+
+    let raw_address = ptr as usize;
+    let virtual_address = VirtAddr::from(raw_address);
+
+    let vpn = virtual_address.floor();
+    let ppn: PhysAddr = page_table.translate(vpn).unwrap().ppn().into();
+
+    let offset = virtual_address.page_offset();
+    let start: usize = ppn.into();
+
+    let physical_address: usize = start + offset;
+
+    return physical_address as *mut T;
+
+
+}
